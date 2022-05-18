@@ -7,7 +7,12 @@ require github.com/charmbracelet/bubbletea v0.20.0
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/charmbracelet/lipgloss v0.4.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/jomei/notionapi v1.8.3 // indirect
+	github.com/muesli/cancelreader v0.2.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
+	github.com/slack-go/slack v0.10.3 // indirect
 )
 
 require (
@@ -21,6 +26,6 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
-	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 )

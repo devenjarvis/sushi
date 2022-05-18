@@ -5,6 +5,8 @@ package views
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -34,17 +36,26 @@ var (
 	}()
 )
 
-type ChatModel struct {
-	Content  string
+type ChatViewport struct {
+	content  string
 	ready    bool
 	viewport viewport.Model
 }
 
-func (m ChatModel) Init() tea.Cmd {
+func NewChatViewport() ChatViewport {
+	content, err := ioutil.ReadFile("artichoke.md")
+	if err != nil {
+		fmt.Println("could not load file:", err)
+		os.Exit(1)
+	}
+	return ChatViewport{content: string(content)}
+}
+
+func (m ChatViewport) Init() tea.Cmd {
 	return nil
 }
 
-func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
+func (m ChatViewport) Update(msg tea.Msg) (ChatViewport, tea.Cmd) {
 	var (
 		cmd  tea.Cmd
 		cmds []tea.Cmd
@@ -70,7 +81,7 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 			m.viewport = viewport.New(msg.Width, msg.Height-verticalMarginHeight)
 			m.viewport.YPosition = headerHeight
 			m.viewport.HighPerformanceRendering = useHighPerformanceRenderer
-			m.viewport.SetContent(m.Content)
+			m.viewport.SetContent(m.content)
 			m.ready = true
 
 			// This is only necessary for high performance rendering, which in
@@ -99,20 +110,20 @@ func (m ChatModel) Update(msg tea.Msg) (ChatModel, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m ChatModel) View() string {
+func (m ChatViewport) View() string {
 	if !m.ready {
 		return "\n  Initializing..."
 	}
 	return fmt.Sprintf("%s\n%s\n%s", m.headerView(), m.viewport.View(), m.footerView())
 }
 
-func (m ChatModel) headerView() string {
+func (m ChatViewport) headerView() string {
 	title := titleStyle.Render("Mr. Pager")
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(title)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, title, line)
 }
 
-func (m ChatModel) footerView() string {
+func (m ChatViewport) footerView() string {
 	info := infoStyle.Render(fmt.Sprintf("%3.f%%", m.viewport.ScrollPercent()*100))
 	line := strings.Repeat("─", max(0, m.viewport.Width-lipgloss.Width(info)))
 	return lipgloss.JoinHorizontal(lipgloss.Center, line, info)
@@ -124,23 +135,3 @@ func max(a, b int) int {
 	}
 	return b
 }
-
-// func main() {
-// 	// Load some text for our viewport
-// 	content, err := ioutil.ReadFile("artichoke.md")
-// 	if err != nil {
-// 		fmt.Println("could not load file:", err)
-// 		os.Exit(1)
-// 	}
-
-// 	p := tea.NewProgram(
-// 		model{content: string(content)},
-// 		tea.WithAltScreen(),       // use the full size of the terminal in its "alternate screen buffer"
-// 		tea.WithMouseCellMotion(), // turn on mouse support so we can track the mouse wheel
-// 	)
-
-// 	if err := p.Start(); err != nil {
-// 		fmt.Println("could not run program:", err)
-// 		os.Exit(1)
-// 	}
-// }
