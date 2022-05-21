@@ -1,4 +1,4 @@
-module slvck
+module sushi
 
 go 1.18
 

@@ -7,7 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"sushi/internal/prompt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -16,19 +17,20 @@ type tickMsg struct{}
 type errMsg error
 
 type model struct {
-	textInput textinput.Model
+	textInput prompt.Model
 	err       error
+	cmd       []string
 }
 
 func initialModel() model {
-	ti := textinput.New()
+	ti := prompt.New()
 	ti.Placeholder = "Cmd"
 	ti.Focus()
 	ti.CharLimit = 156
-	ti.Width = 20
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	ti.CursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	ti.Width = 0
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3185FC"))
+	ti.CursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3185FC"))
+	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0F7F4"))
 
 	return model{
 		textInput: ti,
@@ -37,7 +39,7 @@ func initialModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return prompt.Blink
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -47,8 +49,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEnter:
-			execInput(m.textInput.Value())
-			//m.textInput.SetCursorMode(textinput.CursorHide)
+			input := strings.TrimSuffix(m.textInput.Value(), "\n")
+			m.cmd = strings.Split(input, " ")
 			return m, tea.Quit
 		}
 
@@ -68,14 +70,7 @@ func (m model) View() string {
 	) + "\n"
 }
 
-type editorFinishedMsg struct{ err error }
-
-func execInput(input string) error {
-	// Remove newline
-	input = strings.TrimSuffix(input, "\n")
-
-	args := strings.Split(input, " ")
-
+func execCmd(args []string) error {
 	// Check for built-in commands
 	switch args[0] {
 	case "cd":
@@ -88,25 +83,37 @@ func execInput(input string) error {
 		os.Exit(0)
 	}
 
-	// Prepare command to execute
-	cmd := exec.Command(args[0], args[1:]...)
+	// Make sure command exists
+	_, err := exec.LookPath(args[0])
+	if err != nil {
+		errMsg := fmt.Sprintf("didn't find '%s'", args[0])
+		return errors.New(errMsg)
+	} else {
+		// Prepare command to execute
+		cmd := exec.Command(args[0], args[1:]...)
 
-	// Set correct output device
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 
-	//Execute the command
-	return cmd.Run()
+		//Execute the command
+		return cmd.Run()
+	}
 }
 
 func main() {
-	// reader := bufio.NewReader(os.Stdin)
 	for {
 		p := tea.NewProgram(initialModel())
-		_, err := p.StartReturningModel()
+		m, err := p.StartReturningModel()
 		if err != nil {
 			fmt.Println("Oh no:", err)
 			os.Exit(1)
+		}
+
+		if m, ok := m.(model); ok && len(m.cmd) > 0 {
+			if err := execCmd(m.cmd); err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 }
