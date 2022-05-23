@@ -5,11 +5,13 @@ go 1.18
 require github.com/charmbracelet/bubbletea v0.20.0
 
 require (
+	github.com/BurntSushi/toml v1.1.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/charmbracelet/lipgloss v0.4.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jomei/notionapi v1.8.3 // indirect
 	github.com/muesli/cancelreader v0.2.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sahilm/fuzzy v0.1.0 // indirect
 	github.com/slack-go/slack v0.10.3 // indirect
