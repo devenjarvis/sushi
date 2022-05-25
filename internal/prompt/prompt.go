@@ -2,6 +2,7 @@ package prompt
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	rw "github.com/mattn/go-runewidth"
 )
 
@@ -130,6 +132,12 @@ type Model struct {
 	// Underlying text value.
 	value []rune
 
+	// Hint string for value
+	hint string
+
+	// List of possible executables
+	executables []string
+
 	// focus indicates whether user input focus should be on this input
 	// component. When false, ignore keyboard input and hide the cursor.
 	focus bool
@@ -153,13 +161,15 @@ type Model struct {
 }
 
 // NewModel creates a new model with default settings.
-func New() Model {
+func New(executables []string) Model {
 	return Model{
 		Prompt:           "> ",
 		BlinkSpeed:       defaultBlinkSpeed,
 		EchoCharacter:    '*',
 		CharLimit:        0,
 		PlaceholderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		hint:             "test",
+		executables:      executables,
 
 		id:         nextID(),
 		value:      nil,
@@ -648,7 +658,24 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			// Input a regular character
 			if m.CharLimit <= 0 || len(m.value) < m.CharLimit {
 				m.value = append(m.value[:m.pos], append(msg.Runes, m.value[m.pos:]...)...)
-				resetBlink = m.setCursor(m.pos + len(msg.Runes))
+
+				matches := fuzzy.RankFind(string(m.value), m.executables)
+
+				if len(matches) > 0 {
+					sort.Sort(matches)
+					top_match := matches[0].Target
+
+					if len(m.value) < len(top_match) {
+						m.hint = top_match[len(m.value):]
+					} else {
+						m.hint = ""
+					}
+					resetBlink = m.setCursor(m.pos + len(msg.Runes))
+
+				} else {
+					m.hint = ""
+				}
+
 			}
 		}
 
@@ -710,10 +737,12 @@ func (m Model) View() string {
 	}
 
 	styleText := m.TextStyle.Inline(true).Render
+	styleHint := m.PlaceholderStyle.Inline(true).Render
 
 	value := m.value[m.offset:m.offsetRight]
 	pos := max(0, m.pos-m.offset)
 	v := styleText(m.echoTransform(string(value[:pos])))
+	v += styleHint(m.echoTransform(string(m.hint))) // hint after text
 
 	if pos < len(value) {
 		v += m.cursorView(m.echoTransform(string(value[pos]))) // cursor and text under it

@@ -4,15 +4,18 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"sushi/internal/prompt"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/sys/unix"
 )
 
 type tickMsg struct{}
@@ -27,8 +30,8 @@ type model struct {
 	historyPos int
 }
 
-func initialModel(homeDir string, cmdHistory []string) model {
-	ti := prompt.New()
+func initialModel(homeDir string, cmdHistory []string, executables []string) model {
+	ti := prompt.New(executables)
 	ti.Placeholder = "Cmd"
 	ti.Focus()
 	ti.CharLimit = 156
@@ -171,13 +174,42 @@ func initHistory(sushiHistoryPath string) ([]string, error) {
 	return nil, nil
 }
 
-func initialize(homeDir string) ([]string, error) {
+func initialize(homeDir string) ([]string, []string, error) {
 	// Create history file
 	sushiHistoryPath := fmt.Sprintf("%s/.sushi_history", homeDir)
 
 	cmdHistory, err := initHistory(sushiHistoryPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	// Load PATH
+	full_path := os.Getenv("PATH")
+	split_path := filepath.SplitList(full_path)
+
+	var executables []string
+
+	for _, path := range split_path {
+		filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			info, err := d.Info()
+			if err == nil {
+				// Check if executable
+				if info.Mode().Perm()&0111 != 0 {
+					// Check if user has access (Unix)
+					access_err := unix.Access(path, 0x1)
+					if access_err != nil {
+						return nil
+					} else {
+						executables = append(executables, d.Name())
+					}
+				}
+			}
+
+			return nil
+		})
 	}
 
 	// Create config file
@@ -188,16 +220,16 @@ func initialize(homeDir string) ([]string, error) {
 			// sushi config file does not exist
 			_, create_err := os.Create(sushiConfigPath)
 			if create_err != nil {
-				return cmdHistory, create_err
+				return cmdHistory, executables, create_err
 			}
 		} else {
-			return cmdHistory, err
+			return cmdHistory, executables, err
 		}
 	} else {
 		// run config
 	}
 
-	return cmdHistory, nil
+	return cmdHistory, executables, nil
 }
 
 func appendHistory(home_dir string, command string, cmdHistory []string) []string {
@@ -238,12 +270,12 @@ func main() {
 	usr, _ := user.Current()
 	homeDir := usr.HomeDir
 
-	cmdHistory, init_err := initialize(homeDir)
+	cmdHistory, executables, init_err := initialize(homeDir)
 	if init_err != nil {
 		fmt.Println("Initialization Error:", init_err)
 	} else {
 		for {
-			p := tea.NewProgram(initialModel(homeDir, cmdHistory))
+			p := tea.NewProgram(initialModel(homeDir, cmdHistory, executables))
 			m, err := p.StartReturningModel()
 			if err != nil {
 				fmt.Println("Oh no:", err)
