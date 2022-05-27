@@ -584,6 +584,26 @@ func (m Model) echoTransform(v string) string {
 	}
 }
 
+func (m *Model) updateHint() {
+	// Check for hint
+	matches := fuzzy.RankFind(string(m.value), m.executables)
+
+	// Show hint if available
+	if len(matches) > 0 {
+		sort.Sort(matches)
+		top_match := matches[0].Target
+
+		if len(m.value) < len(top_match) {
+			m.hint = top_match[len(m.value):]
+		} else {
+			m.hint = ""
+		}
+
+	} else {
+		m.hint = ""
+	}
+}
+
 // Update is the Bubble Tea update loop.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	if !m.focus {
@@ -602,6 +622,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			} else {
 				if len(m.value) > 0 {
 					m.value = append(m.value[:max(0, m.pos-1)], m.value[m.pos:]...)
+
+					m.updateHint()
+
 					if m.pos > 0 {
 						resetBlink = m.setCursor(m.pos - 1)
 					}
@@ -659,22 +682,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.CharLimit <= 0 || len(m.value) < m.CharLimit {
 				m.value = append(m.value[:m.pos], append(msg.Runes, m.value[m.pos:]...)...)
 
-				matches := fuzzy.RankFind(string(m.value), m.executables)
-
-				if len(matches) > 0 {
-					sort.Sort(matches)
-					top_match := matches[0].Target
-
-					if len(m.value) < len(top_match) {
-						m.hint = top_match[len(m.value):]
-					} else {
-						m.hint = ""
-					}
-					resetBlink = m.setCursor(m.pos + len(msg.Runes))
-
-				} else {
-					m.hint = ""
-				}
+				m.updateHint()
+				resetBlink = m.setCursor(m.pos + len(msg.Runes))
 
 			}
 		}
@@ -727,6 +736,16 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	m.handleOverflow()
 	return m, cmd
+}
+
+func (m *Model) generateValueView() string {
+	var built_value string
+	if len(m.hint) > 0 {
+		// for _, char := range m.hint {
+		// }
+	}
+
+	return built_value
 }
 
 // View renders the textinput in its current state.

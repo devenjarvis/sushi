@@ -187,7 +187,8 @@ func initialize(homeDir string) ([]string, []string, error) {
 	full_path := os.Getenv("PATH")
 	split_path := filepath.SplitList(full_path)
 
-	var executables []string
+	// Initialize with internal list of commands
+	executables := []string{"cd", "exit"}
 
 	for _, path := range split_path {
 		filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
