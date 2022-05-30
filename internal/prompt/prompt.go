@@ -2,7 +2,6 @@ package prompt
 
 import (
 	"context"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 	rw "github.com/mattn/go-runewidth"
 )
 
@@ -168,7 +166,6 @@ func New(executables []string) Model {
 		EchoCharacter:    '*',
 		CharLimit:        0,
 		PlaceholderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		hint:             "test",
 		executables:      executables,
 
 		id:         nextID(),
@@ -176,7 +173,7 @@ func New(executables []string) Model {
 		focus:      false,
 		blink:      true,
 		pos:        0,
-		cursorMode: CursorBlink,
+		cursorMode: CursorStatic,
 
 		blinkCtx: &blinkCtx{
 			ctx: context.Background(),
@@ -584,24 +581,28 @@ func (m Model) echoTransform(v string) string {
 	}
 }
 
-func (m *Model) updateHint() {
-	// Check for hint
-	matches := fuzzy.RankFind(string(m.value), m.executables)
+// func (m *Model) updateHint() {
+// 	// Check for hint
+// 	matches := fuzzy.RankFind(string(m.value), m.executables)
 
-	// Show hint if available
-	if len(matches) > 0 {
-		sort.Sort(matches)
-		top_match := matches[0].Target
+// 	// Show hint if available
+// 	if len(matches) > 0 {
+// 		sort.Sort(matches)
+// 		top_match := matches[0].Target
 
-		if len(m.value) < len(top_match) {
-			m.hint = top_match[len(m.value):]
-		} else {
-			m.hint = ""
-		}
+// 		if len(m.value) < len(top_match) {
+// 			m.hint = top_match[len(m.value):]
+// 		} else {
+// 			m.hint = ""
+// 		}
 
-	} else {
-		m.hint = ""
-	}
+// 	} else {
+// 		m.hint = ""
+// 	}
+// }
+
+func (m Model) Init() tea.Cmd {
+	return nil
 }
 
 // Update is the Bubble Tea update loop.
@@ -623,7 +624,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				if len(m.value) > 0 {
 					m.value = append(m.value[:max(0, m.pos-1)], m.value[m.pos:]...)
 
-					m.updateHint()
+					// m.updateHint()
 
 					if m.pos > 0 {
 						resetBlink = m.setCursor(m.pos - 1)
@@ -682,7 +683,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if m.CharLimit <= 0 || len(m.value) < m.CharLimit {
 				m.value = append(m.value[:m.pos], append(msg.Runes, m.value[m.pos:]...)...)
 
-				m.updateHint()
+				// m.updateHint()
 				resetBlink = m.setCursor(m.pos + len(msg.Runes))
 
 			}

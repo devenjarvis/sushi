@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"sushi/internal/hint"
 	"sushi/internal/prompt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,17 +22,24 @@ import (
 type tickMsg struct{}
 type errMsg error
 
+const (
+	textInput = iota
+	hintInput = iota
+)
+
 type model struct {
-	textInput  prompt.Model
-	homeDir    string
-	err        error
-	cmd        []string
-	cmdHistory []string
-	historyPos int
+	textInput   prompt.Model
+	hintInput   hint.Model
+	activeInput int
+	homeDir     string
+	err         error
+	cmd         []string
+	cmdHistory  []string
+	historyPos  int
 }
 
-func initialModel(homeDir string, cmdHistory []string, executables []string) model {
-	ti := prompt.New(executables)
+func initialModel(homeDir string, cmdHistory []string, commands []string) model {
+	ti := prompt.New(commands)
 	ti.Placeholder = "Cmd"
 	ti.Focus()
 	ti.CharLimit = 156
@@ -41,11 +49,13 @@ func initialModel(homeDir string, cmdHistory []string, executables []string) mod
 	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0F7F4"))
 
 	return model{
-		textInput:  ti,
-		homeDir:    homeDir,
-		cmdHistory: cmdHistory,
-		err:        nil,
-		historyPos: 0,
+		textInput:   ti,
+		activeInput: textInput,
+		hintInput:   hint.New(commands),
+		homeDir:     homeDir,
+		cmdHistory:  cmdHistory,
+		err:         nil,
+		historyPos:  0,
 	}
 }
 
@@ -64,20 +74,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cmd = parseInput(m.homeDir, input)
 			return m, tea.Quit
 		case tea.KeyUp:
-			if len(m.textInput.Value()) == 0 && len(m.cmdHistory) > 0 {
-				m.historyPos = 1
-				m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
-			} else if m.historyPos > 0 && m.historyPos < len(m.cmdHistory) {
-				m.historyPos++
-				m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
+			if m.activeInput == textInput {
+				if len(m.textInput.Value()) == 0 && len(m.cmdHistory) > 0 {
+					m.historyPos = 1
+					m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
+				} else if m.historyPos > 0 && m.historyPos < len(m.cmdHistory) {
+					m.historyPos++
+					m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
+				}
+			} else {
+				m.hintInput, cmd = m.hintInput.Update(msg)
+				m.activeInput = textInput
 			}
+
 		case tea.KeyDown:
 			if m.historyPos > 1 {
 				m.historyPos--
 				m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
 			} else if m.historyPos == 1 {
 				m.textInput.SetValue("")
+			} else if m.historyPos == 0 {
+				m.textInput, cmd = m.textInput.Update(msg)
+				m.activeInput = hintInput
 			}
+		case tea.KeyTab: // Accept hint
+			m.textInput.SetValue(m.hintInput.GetChoice())
+			m.textInput.SetCursor(len(m.textInput.Value()))
+			m.hintInput.SetActive(false)
+			m.hintInput, cmd = m.hintInput.Update(msg)
+			m.activeInput = textInput
 		case tea.KeyCtrlC:
 			return m, tea.Quit
 		}
@@ -88,14 +113,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.textInput, cmd = m.textInput.Update(msg)
+	if m.activeInput == textInput {
+		m.textInput, cmd = m.textInput.Update(msg)
+		m.hintInput.UpdateHintOptions(m.textInput.Value())
+	} else if m.activeInput == hintInput {
+		m.hintInput, cmd = m.hintInput.Update(msg)
+	}
 	return m, cmd
 }
 
 func (m model) View() string {
-	return fmt.Sprintf(
-		m.textInput.View(),
-	) + "\n"
+	s := lipgloss.JoinVertical(lipgloss.Left, m.textInput.View(), m.hintInput.View())
+	// return fmt.Sprintf(
+	// 	m.textInput.View(),
+	// ) + "\n"
+	return s
 }
 
 func execCmd(args []string) error {
@@ -188,7 +220,8 @@ func initialize(homeDir string) ([]string, []string, error) {
 	split_path := filepath.SplitList(full_path)
 
 	// Initialize with internal list of commands
-	executables := []string{"cd", "exit"}
+	commandMap := make(map[string]bool)
+	commands := []string{"cd", "exit"}
 
 	for _, path := range split_path {
 		filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
@@ -204,7 +237,10 @@ func initialize(homeDir string) ([]string, []string, error) {
 					if access_err != nil {
 						return nil
 					} else {
-						executables = append(executables, d.Name())
+						if _, value := commandMap[d.Name()]; !value {
+							commandMap[d.Name()] = true
+							commands = append(commands, d.Name())
+						}
 					}
 				}
 			}
@@ -221,16 +257,16 @@ func initialize(homeDir string) ([]string, []string, error) {
 			// sushi config file does not exist
 			_, create_err := os.Create(sushiConfigPath)
 			if create_err != nil {
-				return cmdHistory, executables, create_err
+				return cmdHistory, commands, create_err
 			}
 		} else {
-			return cmdHistory, executables, err
+			return cmdHistory, commands, err
 		}
 	} else {
 		// run config
 	}
 
-	return cmdHistory, executables, nil
+	return cmdHistory, commands, nil
 }
 
 func appendHistory(home_dir string, command string, cmdHistory []string) []string {
@@ -271,12 +307,12 @@ func main() {
 	usr, _ := user.Current()
 	homeDir := usr.HomeDir
 
-	cmdHistory, executables, init_err := initialize(homeDir)
+	cmdHistory, commands, init_err := initialize(homeDir)
 	if init_err != nil {
 		fmt.Println("Initialization Error:", init_err)
 	} else {
 		for {
-			p := tea.NewProgram(initialModel(homeDir, cmdHistory, executables))
+			p := tea.NewProgram(initialModel(homeDir, cmdHistory, commands))
 			m, err := p.StartReturningModel()
 			if err != nil {
 				fmt.Println("Oh no:", err)
