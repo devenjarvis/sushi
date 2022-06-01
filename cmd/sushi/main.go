@@ -21,6 +21,7 @@ import (
 
 type tickMsg struct{}
 type errMsg error
+type switchMsg struct{}
 
 const (
 	textInput = iota
@@ -36,26 +37,27 @@ type model struct {
 	cmd         []string
 	cmdHistory  []string
 	historyPos  int
+	width       int
+	height      int
 }
 
 func initialModel(homeDir string, cmdHistory []string, commands []string) model {
-	ti := prompt.New(commands)
+	ti := prompt.New()
 	ti.Placeholder = "Cmd"
-	ti.Focus()
+	ti.Focus(false)
 	ti.CharLimit = 156
 	ti.Width = 0
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3185FC"))
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3185FC")).Faint(true)
 	ti.CursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#3185FC"))
 	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#F0F7F4"))
 
 	return model{
-		textInput:   ti,
-		activeInput: textInput,
-		hintInput:   hint.New(commands),
-		homeDir:     homeDir,
-		cmdHistory:  cmdHistory,
-		err:         nil,
-		historyPos:  0,
+		textInput:  ti,
+		hintInput:  hint.New(commands),
+		homeDir:    homeDir,
+		cmdHistory: cmdHistory,
+		err:        nil,
+		historyPos: 0,
 	}
 }
 
@@ -72,9 +74,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			input := strings.TrimSuffix(m.textInput.Value(), "\n")
 			m.cmd = parseInput(m.homeDir, input)
+			m.hintInput.Clear()
+			m.textInput.Blur()
 			return m, tea.Quit
 		case tea.KeyUp:
-			if m.activeInput == textInput {
+			if m.hintInput.Focused() {
+				m.hintInput.Blur()
+				m.textInput.Focus(true)
+			} else {
 				if len(m.textInput.Value()) == 0 && len(m.cmdHistory) > 0 {
 					m.historyPos = 1
 					m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
@@ -82,9 +89,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.historyPos++
 					m.textInput.SetValue(m.cmdHistory[len(m.cmdHistory)-m.historyPos])
 				}
-			} else {
-				m.hintInput, cmd = m.hintInput.Update(msg)
-				m.activeInput = textInput
+			}
+		case tea.KeyRight:
+			if !m.hintInput.Focused() {
+				if m.textInput.Cursor() == len(m.textInput.Value()) {
+					m.textInput.Blur()
+					m.hintInput.Focus()
+				}
+			}
+		case tea.KeyLeft:
+			if m.hintInput.Focused() {
+				if m.hintInput.GetCursor() == 0 {
+					m.hintInput.Blur()
+					m.textInput.Focus(true)
+				}
 			}
 
 		case tea.KeyDown:
@@ -94,18 +112,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.historyPos == 1 {
 				m.textInput.SetValue("")
 			} else if m.historyPos == 0 {
-				m.textInput, cmd = m.textInput.Update(msg)
-				m.activeInput = hintInput
+				if !m.hintInput.Focused() {
+					m.hintInput.Focus()
+					m.textInput.Blur()
+				}
+			}
+		case tea.KeyBackspace:
+			if m.hintInput.Focused() {
+				m.hintInput.Blur()
+				m.textInput.Focus(false)
 			}
 		case tea.KeyTab: // Accept hint
+			m.hintInput.Blur()
 			m.textInput.SetValue(m.hintInput.GetChoice())
 			m.textInput.SetCursor(len(m.textInput.Value()))
-			m.hintInput.SetActive(false)
-			m.hintInput, cmd = m.hintInput.Update(msg)
-			m.activeInput = textInput
+			m.textInput.Focus(true)
 		case tea.KeyCtrlC:
 			return m, tea.Quit
 		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 
 	// We handle errors just like any other message
 	case errMsg:
@@ -113,17 +140,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.activeInput == textInput {
-		m.textInput, cmd = m.textInput.Update(msg)
-		m.hintInput.UpdateHintOptions(m.textInput.Value())
-	} else if m.activeInput == hintInput {
-		m.hintInput, cmd = m.hintInput.Update(msg)
-	}
+	m.textInput, cmd = m.textInput.Update(msg)
+	m.hintInput.UpdateHintOptions(m.textInput.Value())
+	m.hintInput, cmd = m.hintInput.Update(msg)
 	return m, cmd
 }
 
 func (m model) View() string {
-	s := lipgloss.JoinVertical(lipgloss.Left, m.textInput.View(), m.hintInput.View())
+	promptStyle := lipgloss.NewStyle().Width(m.width - 2).MarginTop(1).BorderStyle(lipgloss.ThickBorder()).BorderLeft(true).BorderForeground(lipgloss.Color("63")).Render
+
+	s := lipgloss.JoinVertical(lipgloss.Left, promptStyle(m.textInput.View()), m.hintInput.View())
 	// return fmt.Sprintf(
 	// 	m.textInput.View(),
 	// ) + "\n"
@@ -131,33 +157,49 @@ func (m model) View() string {
 }
 
 func execCmd(args []string) error {
-	// Check for built-in commands
-	switch args[0] {
-	case "cd":
-		if len(args) < 2 {
-			return errors.New("path required")
+	if len(args) > 0 {
+		// Check for background process
+		backgroundProcess := false
+
+		// Check for background process
+		if args[len(args)-1] == "&" {
+			backgroundProcess = true
+			args = args[:len(args)-1]
+		}
+		// Check for built-in commands
+		switch args[0] {
+		case "cd":
+			if len(args) < 2 {
+				return errors.New("path required")
+			}
+
+			return os.Chdir(args[1])
+		case "exit":
+			os.Exit(0)
 		}
 
-		return os.Chdir(args[1])
-	case "exit":
-		os.Exit(0)
-	}
+		// Make sure command exists
+		_, err := exec.LookPath(args[0])
+		if err != nil {
+			errMsg := fmt.Sprintf("didn't find '%s'", args[0])
+			return errors.New(errMsg)
+		} else {
+			// Prepare command to execute
+			cmd := exec.Command(args[0], args[1:]...)
 
-	// Make sure command exists
-	_, err := exec.LookPath(args[0])
-	if err != nil {
-		errMsg := fmt.Sprintf("didn't find '%s'", args[0])
-		return errors.New(errMsg)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			//Execute the command
+			if backgroundProcess {
+				return cmd.Start()
+			} else {
+				cmd.Stdin = os.Stdin
+				return cmd.Run()
+			}
+		}
 	} else {
-		// Prepare command to execute
-		cmd := exec.Command(args[0], args[1:]...)
-
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		//Execute the command
-		return cmd.Run()
+		return nil
 	}
 }
 
@@ -296,6 +338,11 @@ func appendHistory(home_dir string, command string, cmdHistory []string) []strin
 func parseInput(homeDir string, input string) []string {
 	// Sustitute home directory
 	input = strings.ReplaceAll(input, "~", homeDir)
+
+	// Make sure background commands have a space
+	if input[len(input)-1] == '&' && input[len(input)-2] != ' ' {
+		input = fmt.Sprintf("%s%s", input[:len(input)-1], " &")
+	}
 
 	// Split on space to build command
 	cmd := strings.Split(input, " ")

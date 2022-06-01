@@ -33,6 +33,8 @@ func nextID() int {
 // initialBlinkMsg initializes cursor blinking.
 type initialBlinkMsg struct{}
 
+type switchMsg struct{}
+
 // blinkMsg signals that the cursor should blink. It contains metadata that
 // allows us to tell if the blink message is the one we're expecting.
 type blinkMsg struct {
@@ -130,15 +132,11 @@ type Model struct {
 	// Underlying text value.
 	value []rune
 
-	// Hint string for value
-	hint string
-
-	// List of possible executables
-	executables []string
-
 	// focus indicates whether user input focus should be on this input
 	// component. When false, ignore keyboard input and hide the cursor.
 	focus bool
+
+	activated bool
 
 	// Cursor blink state.
 	blink bool
@@ -159,14 +157,13 @@ type Model struct {
 }
 
 // NewModel creates a new model with default settings.
-func New(executables []string) Model {
+func New() Model {
 	return Model{
-		Prompt:           "> ",
+		Prompt:           " ",
 		BlinkSpeed:       defaultBlinkSpeed,
 		EchoCharacter:    '*',
 		CharLimit:        0,
 		PlaceholderStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		executables:      executables,
 
 		id:         nextID(),
 		value:      nil,
@@ -282,8 +279,9 @@ func (m Model) Focused() bool {
 
 // Focus sets the focus state on the model. When the model is in focus it can
 // receive keyboard input and the cursor will be hidden.
-func (m *Model) Focus() tea.Cmd {
+func (m *Model) Focus(activate bool) tea.Cmd {
 	m.focus = true
+	m.activated = activate
 	m.blink = m.cursorMode == CursorHide // show the cursor unless we've explicitly hidden it
 
 	if m.cursorMode == CursorBlink && m.focus {
@@ -611,6 +609,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.blink = true
 		return m, nil
 	}
+	if m.activated {
+		m.activated = false
+		return m, nil
+	}
 
 	var resetBlink bool
 
@@ -739,16 +741,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) generateValueView() string {
-	var built_value string
-	if len(m.hint) > 0 {
-		// for _, char := range m.hint {
-		// }
-	}
-
-	return built_value
-}
-
 // View renders the textinput in its current state.
 func (m Model) View() string {
 	// Placeholder text
@@ -757,12 +749,10 @@ func (m Model) View() string {
 	}
 
 	styleText := m.TextStyle.Inline(true).Render
-	styleHint := m.PlaceholderStyle.Inline(true).Render
 
 	value := m.value[m.offset:m.offsetRight]
 	pos := max(0, m.pos-m.offset)
 	v := styleText(m.echoTransform(string(value[:pos])))
-	v += styleHint(m.echoTransform(string(m.hint))) // hint after text
 
 	if pos < len(value) {
 		v += m.cursorView(m.echoTransform(string(value[pos]))) // cursor and text under it
