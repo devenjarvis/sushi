@@ -2,12 +2,12 @@ module sushi
 
 go 1.18
 
-require github.com/charmbracelet/bubbletea v0.20.0
+require github.com/charmbracelet/bubbletea v0.21.0
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
-	github.com/charmbracelet/lipgloss v0.4.0 // indirect
+	github.com/charmbracelet/lipgloss v0.5.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/jomei/notionapi v1.8.3 // indirect
 	github.com/lithammer/fuzzysearch v1.1.5 // indirect
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/charmbracelet/bubbles v0.10.3
+	github.com/charmbracelet/bubbles v0.11.0
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/fogleman/ease v0.0.0-20170301025033-8da417bf1776
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
