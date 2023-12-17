@@ -16,7 +16,7 @@ Some critical missing features include:
 - Lots of things probably
 
 ## How to Install 💻
-Basically clone this repo, and from the root you can start the shell with `go run ./cmd/sushi`. If you want to get out of the sheel `ctrl/cmd + C` should do it.
+Basically clone this repo, and from the root you can start the shell with `go run ./cmd/sushi`. If you want to get out of the sheel `ctrl + C` should do it.
 
 ## Goals 🎯 
-Primarily just a project to learn more about Go, so I'd say mission accomplished. Sharing it incase its interesting to someone else. Maybe I'll pick it back up andm ake it more robusto ne day...
+Primarily just a project to learn more about Go, so I'd say mission accomplished. Sharing it incase its interesting to someone else. Maybe I'll pick it back up and make it more robust one day...
