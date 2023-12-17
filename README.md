@@ -1,6 +1,6 @@
 # 🍣 sushi
 
-***S**lick **U**ser-friend **SH**ell **I**nterface*
+***S**lick **U**ser-friendly **SH**ell **I**nterface*
 
 ## Summary 🤏
 A trivial shell I built for myself to get better at Go and experiment with the awesome TUI libraries at Charm. I haven't worked on this in awhile, but might pick it back up at some point. It certainly comes with no guarantees and hasn't been built with any other users in mind.
