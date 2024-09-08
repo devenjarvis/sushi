@@ -15,6 +15,7 @@ import (
 	"github.com/devenjarvis/sushi/internal/hint"
 	"github.com/devenjarvis/sushi/internal/prompt"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -66,6 +67,19 @@ type model struct {
 
 func initialModel(homeDir string, cmdHistory []string, commands []string) model {
 
+	// Build custom viewport keymap to avoid screen jumping when typing
+	keymap := viewport.KeyMap{
+		PageDown:     key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "page down")),
+		PageUp:       key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "page up")),
+		HalfPageUp:   key.NewBinding(key.WithKeys("ctrl+u"), key.WithHelp("ctrl+u", "½ page up")),
+		HalfPageDown: key.NewBinding(key.WithKeys("ctrl+d"), key.WithHelp("ctrl+d", "½ page down")),
+		Up:           key.NewBinding(key.WithKeys("ctrl+k"), key.WithHelp("ctrl+k", "up")),
+		Down:         key.NewBinding(key.WithKeys("ctrl+j"), key.WithHelp("ctrl+j", "down")),
+	}
+	// Initialize viewport with custom keymap
+	customViewport := viewport.New(100, 100)
+	customViewport.KeyMap = keymap
+
 	return model{
 		ready:       false,
 		toBottom:    false,
@@ -76,6 +90,7 @@ func initialModel(homeDir string, cmdHistory []string, commands []string) model 
 		cmdHistory:  cmdHistory,
 		err:         nil,
 		historyPos:  0,
+		viewport:    customViewport,
 	}
 }
 
@@ -175,22 +190,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.commands[m.currentCmd].textInput.SetValue("")
 		}
-	case tea.WindowSizeMsg:
+	case tea.WindowSizeMsg: // Resize window
 		m.width = msg.Width
 		m.height = msg.Height
-
-		if !m.ready {
-			m.viewport = viewport.Model{
-				Width:           msg.Width,
-				Height:          msg.Height,
-				MouseWheelDelta: 1,
-			}
-			m.ready = true
-		} else {
-			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height
-			//m.fixViewport(true)
-		}
+		m.viewport.Width = msg.Width
+		m.viewport.Height = msg.Height
 
 	// We handle errors just like any other message
 	case errMsg:
