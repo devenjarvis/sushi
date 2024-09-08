@@ -167,7 +167,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commands[m.currentCmd].textInput.SetCursor(len(m.commands[m.currentCmd].textInput.Value()))
 			m.commands[m.currentCmd].textInput.Focus(true)
 		case tea.KeyCtrlC:
-			return m, tea.Quit
+			if m.commands[m.currentCmd].hintInput.Focused() {
+				m.commands[m.currentCmd].hintInput.Blur()
+				m.commands[m.currentCmd].textInput.Focus(true)
+			}
+			m.commands[m.currentCmd].textInput.SetValue("")
 		}
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
