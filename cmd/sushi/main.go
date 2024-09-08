@@ -111,6 +111,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commands[m.currentCmd].stdout = stdout.String()
 				m.commands[m.currentCmd].stderr = stderr.String()
 			}
+			// Store comman in history
+			m.cmdHistory = appendHistory(m.homeDir, input, m.cmdHistory)
 			// Add a new command
 			m.commands = append(m.commands, NewCommand(m.commandList))
 			m.currentCmd += 1
@@ -231,7 +233,7 @@ func (m *model) SetContent(width int) {
 	var b strings.Builder
 
 	for i := range m.commands {
-		b.WriteString(fmt.Sprintf("%s", m.commands[i].View(width)))
+		b.WriteString(m.commands[i].View(width))
 	}
 
 	m.viewport.SetContent(b.String())
