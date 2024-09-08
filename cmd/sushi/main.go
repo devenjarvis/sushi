@@ -111,7 +111,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commands[m.currentCmd].stdout = stdout.String()
 				m.commands[m.currentCmd].stderr = stderr.String()
 			}
-			// Store comman in history
+			// Store command in history
 			m.cmdHistory = appendHistory(m.homeDir, input, m.cmdHistory)
 			// Add a new command
 			m.commands = append(m.commands, NewCommand(m.commandList))
