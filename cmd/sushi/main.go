@@ -64,12 +64,6 @@ type model struct {
 	toBottom    bool
 }
 
-func (m *model) fixViewport() {
-	bottom := m.viewport.Height + m.viewport.YOffset - 1
-
-	m.viewport.SetYOffset(bottom)
-}
-
 func initialModel(homeDir string, cmdHistory []string, commands []string) model {
 
 	return model{
