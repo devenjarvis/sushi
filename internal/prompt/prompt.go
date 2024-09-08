@@ -156,7 +156,7 @@ type Model struct {
 	cursorMode CursorMode
 }
 
-// NewModel creates a new model with default settings.
+// New creates a new model with default settings.
 func New() Model {
 	return Model{
 		Prompt:           "",
@@ -177,11 +177,6 @@ func New() Model {
 		},
 	}
 }
-
-// NewModel creates a new model with default settings.
-//
-// Deprecated. Use New instead.
-var NewModel = New
 
 // SetValue sets the value of the text input.
 func (m *Model) SetValue(s string) {

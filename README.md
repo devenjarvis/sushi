@@ -11,7 +11,6 @@ Some cool features include:
 - Color coded pass/fail indicator for previously run commands
 
 Some critical missing features include:
-- Tab complete only works if you select one of the autocomplete options
 - TUI formatting can be weird sometimes :shrug:
 - Lots of things probably
 
