@@ -461,7 +461,7 @@ func main() {
 	} else {
 		p := tea.NewProgram(initialModel(homeDir, cmdHistory, commands), tea.WithAltScreen(), tea.WithMouseCellMotion())
 
-		err := p.Start()
+		_, err := p.Run()
 		if err != nil {
 			fmt.Println("Oh no:", err)
 			os.Exit(1)
