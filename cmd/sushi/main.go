@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sushi/internal/hint"
-	"sushi/internal/prompt"
+	"github.com/devenjarvis/sushi/internal/hint"
+	"github.com/devenjarvis/sushi/internal/prompt"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
